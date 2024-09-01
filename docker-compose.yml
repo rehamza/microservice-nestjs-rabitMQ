@@ -1,0 +1,64 @@
+services:
+  invoice-generator:
+    build:
+      context: .
+      dockerfile: ./apps/invoice-generator/Dockerfile
+      target: development
+    command: npm run start:dev invoice-generator
+    env_file:
+      - ./apps/invoice-generator/.env
+    depends_on:
+      - mongodb-primary
+      - mongodb-secondary
+      - email-sender
+      - rabbitmq
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - '3000:3000'
+  email-sender:
+    build:
+      context: .
+      dockerfile: ./apps/email-sender/Dockerfile
+      target: development
+    command: npm run start:dev email-sender
+    env_file:
+      - ./apps/email-sender/.env
+    depends_on:
+      - rabbitmq
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - '3001:3001'
+  rabbitmq:
+    image: rabbitmq
+    ports:
+      - '5672:5672'
+  mongodb-primary:
+    image: docker.io/bitnami/mongodb:5.0
+    environment:
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb-primary
+      - MONGODB_REPLICA_SET_MODE=primary
+      - MONGODB_ROOT_PASSWORD=password123
+      - MONGODB_REPLICA_SET_KEY=replicasetkey123
+    volumes:
+      - 'mongodb_master_data:/bitnami/mongodb'
+    ports:
+      - '27017:27017'
+
+  mongodb-secondary:
+    image: docker.io/bitnami/mongodb:5.0
+    depends_on:
+      - mongodb-primary
+    environment:
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb-secondary
+      - MONGODB_REPLICA_SET_MODE=secondary
+      - MONGODB_INITIAL_PRIMARY_HOST=mongodb-primary
+      - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD=password123
+      - MONGODB_REPLICA_SET_KEY=replicasetkey123
+
+volumes:
+  mongodb_master_data:
+    driver: local
